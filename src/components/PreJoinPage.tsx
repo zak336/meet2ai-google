@@ -1,20 +1,34 @@
 import { useState, useRef, useEffect } from 'react';
-import { motion } from 'motion/react';
-import { Mic, MicOff, Video, VideoOff, ArrowRight } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, ArrowRight, ArrowLeft } from 'lucide-react';
 
 interface PreJoinPageProps {
+  isActive: boolean;
   onJoin: () => void;
+  onBack: () => void;
 }
 
-export default function PreJoinPage({ onJoin }: PreJoinPageProps) {
+export default function PreJoinPage({ isActive, onJoin, onBack }: PreJoinPageProps) {
   const [micOn, setMicOn] = useState(false);
   const [videoOn, setVideoOn] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-
   const [error, setError] = useState<string | null>(null);
+  const [visible, setVisible] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    if (isActive) {
+      timerRef.current = setTimeout(() => setVisible(true), 60);
+    } else {
+      setVisible(false);
+    }
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [isActive]);
+
+  useEffect(() => {
+    if (!isActive) return;
     // Initial setup - try to get permissions
     const initMedia = async () => {
       try {
@@ -44,7 +58,7 @@ export default function PreJoinPage({ onJoin }: PreJoinPageProps) {
         stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, []);
+  }, [isActive]);
 
   const toggleMic = () => {
     if (stream) {
@@ -67,20 +81,41 @@ export default function PreJoinPage({ onJoin }: PreJoinPageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#202124] flex items-center justify-center p-4">
-      <div className="max-w-4xl w-full flex flex-col md:flex-row gap-8 items-center">
-        
+    <div className="pj-container">
+      <div className="pj-wrap">
+        <div className={`pj-eyebrow ${visible ? "show" : ""}`}>
+          <span className="pj-eyebrow-dot" />
+          meet2ai · Join Class
+        </div>
+
+        <h2 className={`pj-headline ${visible ? "show" : ""}`}>
+          Ready to <em>begin</em>?
+        </h2>
+
+        <p className={`pj-body ${visible ? "show" : ""}`}>
+          You are about to enter the AI Classroom. Check your audio and video settings before joining.
+        </p>
+
+        <div className={`pj-divider ${visible ? "show" : ""}`} />
+
         {/* Preview Container */}
-        <div className="flex-1 w-full max-w-xl">
-          <div className="relative aspect-video bg-[#3c4043] rounded-2xl overflow-hidden shadow-2xl border border-gray-700">
+        <div className={`pj-preview ${visible ? "show" : ""}`}>
+          <div className="pj-preview-label">Preview</div>
+          <div className="pj-preview-window">
+            <div className="pj-preview-bar">
+              <div className="pj-preview-dot" style={{ background: "#ff5f57" }} />
+              <div className="pj-preview-dot" style={{ background: "#febc2e" }} />
+              <div className="pj-preview-dot" style={{ background: "#28c840" }} />
+            </div>
+            
             {error ? (
-              <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-gray-800">
-                <VideoOff size={48} className="text-red-500 mb-4" />
-                <p className="text-white font-medium mb-2">Media Access Error</p>
-                <p className="text-gray-400 text-sm">{error}</p>
+              <div className="pj-error">
+                <VideoOff size={48} className="pj-error-icon" />
+                <p className="pj-error-title">Media Access Error</p>
+                <p className="pj-error-text">{error}</p>
                 <button 
                   onClick={() => window.location.reload()}
-                  className="mt-4 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm transition-colors"
+                  className="pj-error-btn"
                 >
                   Retry
                 </button>
@@ -91,57 +126,56 @@ export default function PreJoinPage({ onJoin }: PreJoinPageProps) {
                 autoPlay 
                 playsInline 
                 muted 
-                className="w-full h-full object-cover transform scale-x-[-1]"
+                className="pj-video"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <div className="w-24 h-24 rounded-full bg-gray-600 flex items-center justify-center">
-                  <VideoOff size={40} className="text-gray-400" />
+              <div className="pj-video-off">
+                <div className="pj-video-off-avatar">
+                  <VideoOff size={40} className="pj-video-off-icon" />
                 </div>
               </div>
             )}
             
             {!error && (
-              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-4">
+              <div className="pj-controls">
                 <button 
                   onClick={toggleMic}
-                  className={`p-4 rounded-full ${micOn ? 'bg-[#3c4043] hover:bg-[#4d5155] border border-gray-500' : 'bg-red-600 hover:bg-red-700 border-none'} text-white transition-all`}
+                  className={`pj-control-btn ${micOn ? '' : 'off'}`}
+                  title={micOn ? "Mute microphone" : "Unmute microphone"}
                 >
-                  {micOn ? <Mic size={24} /> : <MicOff size={24} />}
+                  {micOn ? <Mic size={20} /> : <MicOff size={20} />}
                 </button>
                 <button 
                   onClick={toggleVideo}
-                  className={`p-4 rounded-full ${videoOn ? 'bg-[#3c4043] hover:bg-[#4d5155] border border-gray-500' : 'bg-red-600 hover:bg-red-700 border-none'} text-white transition-all`}
+                  className={`pj-control-btn ${videoOn ? '' : 'off'}`}
+                  title={videoOn ? "Turn off camera" : "Turn on camera"}
                 >
-                  {videoOn ? <Video size={24} /> : <VideoOff size={24} />}
+                  {videoOn ? <Video size={20} /> : <VideoOff size={20} />}
                 </button>
               </div>
             )}
           </div>
         </div>
 
-        {/* Join Controls */}
-        <div className="flex-1 flex flex-col items-center md:items-start text-center md:text-left space-y-6">
-          <h1 className="text-3xl md:text-4xl font-bold text-white">Ready to join?</h1>
-          <p className="text-gray-400 text-lg">
-            You are about to enter the AI Classroom. Check your audio and video settings before joining.
-          </p>
-          
-          <button 
-            onClick={() => {
-              // Stop local preview stream before joining so the main app can take over
-              if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-              }
-              onJoin();
-            }}
-            className="group relative inline-flex items-center justify-center px-8 py-4 text-lg font-bold text-white transition-all duration-200 bg-blue-600 font-pj rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 hover:bg-blue-700"
-          >
-            Join Class Now
-            <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-          </button>
-        </div>
+        {/* Join Button */}
+        <button 
+          onClick={() => {
+            // Stop local preview stream before joining so the main app can take over
+            if (stream) {
+              stream.getTracks().forEach(track => track.stop());
+            }
+            onJoin();
+          }}
+          className={`pj-join-btn ${visible ? "show" : ""}`}
+        >
+          Join Class Now
+          <ArrowRight size={16} strokeWidth={2} />
+        </button>
 
+        <button className={`pj-back ${visible ? "show" : ""}`} onClick={onBack}>
+          <ArrowLeft size={14} strokeWidth={2} />
+          Back
+        </button>
       </div>
     </div>
   );

@@ -1,28 +1,31 @@
-import { useState } from 'react';
-import LandingPage from './components/LandingPage';
-import PreJoinPage from './components/PreJoinPage';
-import Classroom from './components/Classroom';
+import { useState } from "react";
+import SectionLayer from "./layers/SectionLayer";
+import BackgroundLayer from "./layers/BackgroundLayer";
+import AvatarLayer from "./layers/AvatarLayer";
+
+export type AppPhase =
+  | "intro"
+  | "landing"
+  | "about"
+  | "features"
+  | "join"
+  | "prejoin"
+  | "classroom";
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<'landing' | 'prejoin' | 'classroom'>('landing');
+  const [appPhase, setAppPhase] = useState<AppPhase>("intro");
 
-  const handleStart = () => {
-    setCurrentPage('prejoin');
-  };
-
-  const handleJoin = () => {
-    setCurrentPage('classroom');
-  };
-
-  const handleEndSession = () => {
-    setCurrentPage('landing');
-  };
+  const landingLayoutMode: "centered" | "asymmetrical" = "centered";
 
   return (
     <>
-      {currentPage === 'landing' && <LandingPage onStart={handleStart} />}
-      {currentPage === 'prejoin' && <PreJoinPage onJoin={handleJoin} />}
-      {currentPage === 'classroom' && <Classroom onEndSession={handleEndSession} />}
+      <BackgroundLayer />
+      <AvatarLayer />
+      <SectionLayer
+        appPhase={appPhase}
+        setAppPhase={setAppPhase}
+        landingLayoutMode={landingLayoutMode}
+      />
     </>
   );
 }

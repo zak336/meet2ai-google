@@ -6,3 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+AGENTS.md
+WARP.md
+CLAUDE.md
+.cursorrules
+copilot-instructions.md

@@ -1,12 +1,29 @@
-import { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI } from '@google/genai';
-import jsPDF from 'jspdf';
-import { toPng } from 'html-to-image';
-import { Mic, MicOff, Video, VideoOff, ClosedCaption, Hand, MonitorUp, MoreVertical, PhoneOff, MessageSquare, Users, Shapes, Lock, Info, Download } from 'lucide-react';
-import Whiteboard, { Drawing } from './Whiteboard';
-import CodeBoard from './CodeBoard';
-import ChatPanel from './ChatPanel';
-import AudioVisualizer from './AudioVisualizer';
+import { useState, useRef, useEffect } from "react";
+import { GoogleGenAI } from "@google/genai";
+import jsPDF from "jspdf";
+import { toPng } from "html-to-image";
+import {
+  Mic,
+  MicOff,
+  Video,
+  VideoOff,
+  ClosedCaption,
+  Hand,
+  MonitorUp,
+  MoreVertical,
+  PhoneOff,
+  MessageSquare,
+  Users,
+  Shapes,
+  Lock,
+  Info,
+  Download,
+} from "lucide-react";
+import Whiteboard, { Drawing } from "./Whiteboard";
+import CodeBoard from "./CodeBoard";
+import ChatPanel from "./ChatPanel";
+import AudioVisualizer from "./AudioVisualizer";
+import { i } from "motion/react-client";
 
 // Speech Recognition Types
 declare global {
@@ -19,12 +36,13 @@ declare global {
 let globalUtterance: SpeechSynthesisUtterance | null = null;
 
 interface ClassroomProps {
+  isActive: boolean;
   onEndSession: () => void;
 }
 
 interface Slide {
   id: string;
-  mode: 'whiteboard' | 'code' | 'none';
+  mode: "whiteboard" | "code" | "none";
   text: string;
   drawings: Drawing[];
   diagrams?: Drawing[][];
@@ -33,10 +51,12 @@ interface Slide {
   permanentHighlights: string[];
 }
 
-export default function Classroom({ onEndSession }: ClassroomProps) {
+export default function Classroom({ isActive, onEndSession }: ClassroomProps) {
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [presentationMode, setPresentationMode] = useState<'none' | 'whiteboard' | 'code'>('none');
-  const [codeLanguage, setCodeLanguage] = useState('typescript');
+  const [presentationMode, setPresentationMode] = useState<
+    "none" | "whiteboard" | "code"
+  >("none");
+  const [codeLanguage, setCodeLanguage] = useState("typescript");
   const [slideHistory, setSlideHistory] = useState<Slide[]>([]);
   const [micOn, setMicOn] = useState(false);
   const [videoOn, setVideoOn] = useState(false);
@@ -48,28 +68,34 @@ export default function Classroom({ onEndSession }: ClassroomProps) {
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const screenVideoRef = useRef<HTMLVideoElement>(null);
-  
+
   // Chat & Voice State
-  const [messages, setMessages] = useState<{role: 'user'|'ai', text: string}[]>([]);
-  const [sessionHistory, setSessionHistory] = useState<{timestamp: string, query: string, response: string}[]>([]);
+  const [messages, setMessages] = useState<
+    { role: "user" | "ai"; text: string }[]
+  >([]);
+  const [sessionHistory, setSessionHistory] = useState<
+    { timestamp: string; query: string; response: string }[]
+  >([]);
   const recognitionRef = useRef<any>(null);
   const isListeningRef = useRef(false);
-  
+
   // Use a ref to always access the latest handleSendMessage function
   const handleSendMessageRef = useRef<any>(null);
 
   useEffect(() => {
+    if (!isActive) return;
     // Initialize Speech Recognition
-    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if ("SpeechRecognition" in window || "webkitSpeechRecognition" in window) {
+      const SpeechRecognition =
+        window.SpeechRecognition || window.webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.continuous = false;
       recognitionRef.current.interimResults = false;
-      recognitionRef.current.lang = 'en-US';
+      recognitionRef.current.lang = "en-US";
 
       recognitionRef.current.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
-        console.log('Voice command:', transcript);
+        console.log("Voice command:", transcript);
         if (handleSendMessageRef.current) {
           handleSendMessageRef.current(transcript);
         }
@@ -84,12 +110,12 @@ export default function Classroom({ onEndSession }: ClassroomProps) {
           }
         }
       };
-      
+
       recognitionRef.current.onerror = (event: any) => {
-        console.error('Speech recognition error', event.error);
-        if (event.error === 'not-allowed') {
-           setMicOn(false);
-           isListeningRef.current = false;
+        console.error("Speech recognition error", event.error);
+        if (event.error === "not-allowed") {
+          setMicOn(false);
+          isListeningRef.current = false;
         }
       };
     }
@@ -97,25 +123,49 @@ export default function Classroom({ onEndSession }: ClassroomProps) {
     if (window.innerWidth >= 768) {
       setIsChatOpen(true);
     }
-    
+
     // Greet user on join
-    if ('speechSynthesis' in window && !greetedRef.current) {
+    if ("speechSynthesis" in window && !greetedRef.current) {
       greetedRef.current = true;
       setTimeout(() => {
-        const utterance = new SpeechSynthesisUtterance("Welcome to the AI Classroom! I'm your AI teacher. What would you like to learn today?");
+        const utterance = new SpeechSynthesisUtterance(
+          "Welcome to the AI Classroom! I'm your AI teacher. What would you like to learn today?",
+        );
         const voices = window.speechSynthesis.getVoices();
-        const englishVoice = voices.find(v => v.lang.startsWith('en-') && !v.localService) || 
-                             voices.find(v => v.lang.startsWith('en-')) || 
-                             voices[0];
+        const englishVoice =
+          voices.find((v) => v.lang.startsWith("en-") && !v.localService) ||
+          voices.find((v) => v.lang.startsWith("en-")) ||
+          voices[0];
         if (englishVoice) utterance.voice = englishVoice;
         window.speechSynthesis.speak(utterance);
       }, 1000);
     }
-  }, []);
+  }, [isActive]);
+
+  useEffect(() => {
+    if (!isActive) return;
+
+    let stream;
+
+    async function start() {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: true,
+      });
+    }
+
+    start();
+
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [isActive]);
 
   const toggleMic = async () => {
     if (micOn) {
-      stream?.getAudioTracks().forEach(track => track.stop());
+      stream?.getAudioTracks().forEach((track) => track.stop());
       setMicOn(false);
       isListeningRef.current = false;
       if (recognitionRef.current) {
@@ -126,11 +176,14 @@ export default function Classroom({ onEndSession }: ClassroomProps) {
       }
     } else {
       try {
-        const newStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: videoOn });
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: videoOn,
+        });
         setStream(newStream);
         if (videoRef.current && videoOn) videoRef.current.srcObject = newStream;
         setMicOn(true);
-        
+
         if (recognitionRef.current) {
           isListeningRef.current = true;
           try {
@@ -139,12 +192,20 @@ export default function Classroom({ onEndSession }: ClassroomProps) {
             console.error("Error starting speech recognition:", e);
           }
         } else {
-          alert("Voice control is not supported in this browser. Please use Chrome, Edge, or Safari.");
+          alert(
+            "Voice control is not supported in this browser. Please use Chrome, Edge, or Safari.",
+          );
         }
       } catch (e: any) {
         console.error("Mic error:", e);
-        if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError' || e.message.includes('Permission denied')) {
-          alert("Microphone access was denied. Please allow microphone access in your browser settings to use this feature.");
+        if (
+          e.name === "NotAllowedError" ||
+          e.name === "PermissionDeniedError" ||
+          e.message.includes("Permission denied")
+        ) {
+          alert(
+            "Microphone access was denied. Please allow microphone access in your browser settings to use this feature.",
+          );
         } else {
           alert("Could not access microphone. Please check your device.");
         }
@@ -154,40 +215,52 @@ export default function Classroom({ onEndSession }: ClassroomProps) {
 
   const toggleVideo = async () => {
     if (videoOn) {
-      stream?.getVideoTracks().forEach(track => track.stop());
+      stream?.getVideoTracks().forEach((track) => track.stop());
       setVideoOn(false);
       if (stream && stream.getAudioTracks().length === 0) {
         setStream(null);
       }
     } else {
       try {
-        const newStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: micOn });
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: micOn,
+        });
         setStream(newStream);
         if (videoRef.current) videoRef.current.srcObject = newStream;
         setVideoOn(true);
       } catch (e: any) {
         console.error("Video error:", e);
-        if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError' || e.message.includes('Permission denied')) {
-          alert("Camera access was denied. Please allow camera access in your browser settings to use this feature.");
+        if (
+          e.name === "NotAllowedError" ||
+          e.name === "PermissionDeniedError" ||
+          e.message.includes("Permission denied")
+        ) {
+          alert(
+            "Camera access was denied. Please allow camera access in your browser settings to use this feature.",
+          );
         } else {
           alert("Could not access camera. Please check your device.");
         }
       }
     }
   };
-  
+
   const toggleScreenShare = async () => {
     if (screenShareOn) {
-      screenStream?.getTracks().forEach(track => track.stop());
+      screenStream?.getTracks().forEach((track) => track.stop());
       setScreenShareOn(false);
       setScreenStream(null);
     } else {
       try {
-        const newStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        const newStream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+        });
         setScreenStream(newStream);
-        if (screenVideoRef.current) screenVideoRef.current.srcObject = newStream;
+        if (screenVideoRef.current)
+          screenVideoRef.current.srcObject = newStream;
         setScreenShareOn(true);
-        
+
         // Handle user stopping screen share from browser UI
         newStream.getVideoTracks()[0].onended = () => {
           setScreenShareOn(false);
@@ -195,23 +268,37 @@ export default function Classroom({ onEndSession }: ClassroomProps) {
         };
       } catch (e: any) {
         console.error("Screen share error:", e);
-        if (e.name !== 'NotAllowedError') {
-          alert("Could not start screen sharing. Please check your browser permissions.");
+        if (e.name !== "NotAllowedError") {
+          alert(
+            "Could not start screen sharing. Please check your browser permissions.",
+          );
         }
       }
     }
   };
-  
-  const [whiteboardText, setWhiteboardText] = useState("Welcome to the AI Classroom!\n\nAsk me anything in the chat, and I'll explain it here on the whiteboard.");
+
+  const [whiteboardText, setWhiteboardText] = useState(
+    "Welcome to the AI Classroom!\n\nAsk me anything in the chat, and I'll explain it here on the whiteboard.",
+  );
   const [isWriting, setIsWriting] = useState(false);
   const [typingSpeed, setTypingSpeed] = useState(50);
   const [expectedDuration, setExpectedDuration] = useState(2000);
-  
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const [steps, setSteps] = useState<{spokenText: string, whiteboardText: string, highlightText?: string, permanentHighlight?: string, drawings?: Drawing[]}[]>([]);
+  const [steps, setSteps] = useState<
+    {
+      spokenText: string;
+      whiteboardText: string;
+      highlightText?: string;
+      permanentHighlight?: string;
+      drawings?: Drawing[];
+      diagramPrompt?: string;
+      isGeneratingDiagram?: boolean;
+    }[]
+  >([]);
   const [currentStepIndex, setCurrentStepIndex] = useState(-1);
   const [startedStepIndex, setStartedStepIndex] = useState(-1);
   const [stepWritingComplete, setStepWritingComplete] = useState(false);
@@ -222,10 +309,17 @@ export default function Classroom({ onEndSession }: ClassroomProps) {
   const [currentDrawings, setCurrentDrawings] = useState<Drawing[]>([]);
   const [currentDiagrams, setCurrentDiagrams] = useState<Drawing[][]>([]);
   const [currentImage, setCurrentImage] = useState<string | null>(null);
+  const [stepDrawings, setStepDrawings] = useState<Record<number, Drawing[]>>(
+    {},
+  );
+  const [generatingDiagrams, setGeneratingDiagrams] = useState<
+    Record<number, boolean>
+  >({});
   const clearBoardRef = useRef(true);
   const keepImageRef = useRef(false);
   const executingStepRef = useRef(-1);
   const greetedRef = useRef(false);
+  const sessionIdRef = useRef(0);
 
   useEffect(() => {
     if (steps.length > 0 && currentStepIndex === -1) {
@@ -235,7 +329,11 @@ export default function Classroom({ onEndSession }: ClassroomProps) {
 
   useEffect(() => {
     if (currentStepIndex >= 0 && currentStepIndex < steps.length) {
-      if (stepWritingComplete && stepSpeakingComplete && currentStepIndex === executingStepRef.current) {
+      if (
+        stepWritingComplete &&
+        stepSpeakingComplete &&
+        currentStepIndex === executingStepRef.current
+      ) {
         if (currentStepIndex < steps.length - 1) {
           setStepWritingComplete(false);
           setStepSpeakingComplete(false);
@@ -245,38 +343,66 @@ export default function Classroom({ onEndSession }: ClassroomProps) {
         }
       }
     }
-  }, [stepWritingComplete, stepSpeakingComplete, currentStepIndex, steps.length, isProcessing]);
+  }, [
+    stepWritingComplete,
+    stepSpeakingComplete,
+    currentStepIndex,
+    steps.length,
+    isProcessing,
+  ]);
 
   useEffect(() => {
-    if (currentStepIndex >= 0 && currentStepIndex < steps.length && currentStepIndex !== executingStepRef.current) {
+    if (
+      currentStepIndex >= 0 &&
+      currentStepIndex < steps.length &&
+      currentStepIndex !== executingStepRef.current
+    ) {
+      if (generatingDiagrams[currentStepIndex]) {
+        return; // Wait for diagram generation to finish
+      }
+
       executingStepRef.current = currentStepIndex;
       setStartedStepIndex(currentStepIndex);
       const step = steps[currentStepIndex];
+      const currentStepDrawings =
+        stepDrawings[currentStepIndex] || step.drawings || [];
+
       setStepWritingComplete(false);
       setStepSpeakingComplete(false);
       setSpeechProgress(0);
-      
-      if (step.whiteboardText) {
-        let newText = step.whiteboardText;
-        if (step.drawings && step.drawings.length > 0 && !newText.includes('[DIAGRAM]')) {
-          newText += '\n[DIAGRAM]';
-        }
 
+      let stepText = step.whiteboardText || "";
+      if (currentStepDrawings.length > 0 && !stepText.includes("[DIAGRAM]")) {
+        stepText += (stepText ? "\n" : "") + "[DIAGRAM]";
+      }
+
+      if (stepText) {
         if (currentStepIndex === 0 && clearBoardRef.current) {
-          setWhiteboardText(newText);
+          setWhiteboardText(stepText);
           setPermanentHighlights([]);
-          setCurrentDrawings(step.drawings || []);
-          setCurrentDiagrams(step.drawings && step.drawings.length > 0 ? [step.drawings] : []);
-          
+          setCurrentDrawings(currentStepDrawings);
+          setCurrentDiagrams(
+            currentStepDrawings.length > 0
+              ? [currentStepDrawings]
+              : stepText.includes("[DIAGRAM]")
+                ? [[]]
+                : [],
+          );
+
           if (!keepImageRef.current) {
             setCurrentImage(null);
           }
           keepImageRef.current = false;
         } else {
-          setWhiteboardText(prev => prev + (prev && newText ? "\n" : "") + newText);
-          if (step.drawings && step.drawings.length > 0) {
-            setCurrentDrawings(step.drawings);
-            setCurrentDiagrams(prev => [...prev, step.drawings!]);
+          setWhiteboardText(
+            (prev) => prev + (prev && stepText ? "\n" : "") + stepText,
+          );
+          if (currentStepDrawings.length > 0) {
+            setCurrentDrawings(currentStepDrawings);
+            setCurrentDiagrams((prev) => [...prev, currentStepDrawings]);
+          } else if (stepText.includes("[DIAGRAM]")) {
+            setCurrentDrawings([]);
+            setCurrentDiagrams((prev) => [...prev, []]);
           }
         }
         setIsWriting(true);
@@ -287,7 +413,6 @@ export default function Classroom({ onEndSession }: ClassroomProps) {
           setCurrentDrawings([]);
           setCurrentDiagrams([]);
 
-          
           if (!keepImageRef.current) {
             setCurrentImage(null);
           }
@@ -296,38 +421,78 @@ export default function Classroom({ onEndSession }: ClassroomProps) {
         setIsWriting(false);
         setStepWritingComplete(true);
       }
-      
-      setCurrentHighlight(step.highlightText || "");
-      
+
+      // setCurrentHighlight(step.highlightText || "");
+      setCurrentHighlight("");
+
       if (step.highlightText) {
         setTimeout(() => {
           setCurrentHighlight("");
         }, 2000);
       }
-      
+
       if (step.permanentHighlight) {
-        const newHighlights = step.permanentHighlight.split(',').map(s => s.trim()).filter(Boolean);
-        setPermanentHighlights(prev => [...prev, ...newHighlights]);
+        const newHighlights = step.permanentHighlight
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+        setPermanentHighlights((prev) => [...prev, ...newHighlights]);
       }
-      
-      if (step.drawings && step.drawings.length > 0) {
+
+      if (currentStepDrawings.length > 0) {
         // REPLACE drawings instead of appending to prevent overlap bugs
-        setCurrentDrawings(step.drawings!);
+        setCurrentDrawings(currentStepDrawings);
       }
-      
-      const cleanSpokenText = step.spokenText ? step.spokenText.replace(/^[\/\/#*]+\s*/, '').trim() : '';
-      
-      if ('speechSynthesis' in window && cleanSpokenText !== '') {
+
+      const cleanSpokenText = step.spokenText
+        ? step.spokenText.replace(/^[\/\/#*]+\s*/, "").trim()
+        : "";
+
+      if ("speechSynthesis" in window && cleanSpokenText !== "") {
         const utterance = new SpeechSynthesisUtterance(cleanSpokenText);
         globalUtterance = utterance;
         const voices = window.speechSynthesis.getVoices();
-        const englishVoice = voices.find(v => v.lang.startsWith('en-') && !v.localService) || 
-                             voices.find(v => v.lang.startsWith('en-')) || 
-                             voices[0];
+        const englishVoice =
+          voices.find((v) => v.lang.startsWith("en-") && !v.localService) ||
+          voices.find((v) => v.lang.startsWith("en-")) ||
+          voices[0];
         if (englishVoice) utterance.voice = englishVoice;
-        
+
         utterance.onboundary = (event) => {
-          if (event.name === 'word') {
+          if (event.name === "word") {
+            const charIndex = event.charIndex;
+            const textLength = cleanSpokenText.length;
+            if (textLength > 0) {
+              setSpeechProgress(charIndex / textLength);
+            }
+          }
+        };
+
+        const wordCount = cleanSpokenText.split(" ").length;
+        const estimatedDurationMs = (wordCount / 2.5) * 1000;
+        setExpectedDuration(estimatedDurationMs);
+
+        // Safety timeout to prevent hanging if onend doesn't fire
+        let safetyTimeout: any;
+        let progressInterval: any;
+        const startTime = Date.now();
+        let lastBoundaryTime = Date.now();
+
+        utterance.onstart = () => {
+          progressInterval = setInterval(() => {
+            const elapsed = Date.now() - startTime;
+            const timeProgress = Math.min(0.99, elapsed / estimatedDurationMs);
+
+            // If onboundary hasn't fired in the last 1 second, use time-based progress
+            if (Date.now() - lastBoundaryTime > 1000) {
+              setSpeechProgress((prev) => Math.max(prev, timeProgress));
+            }
+          }, 100);
+        };
+
+        utterance.onboundary = (event) => {
+          lastBoundaryTime = Date.now();
+          if (event.name === "word") {
             const charIndex = event.charIndex;
             const textLength = cleanSpokenText.length;
             if (textLength > 0) {
@@ -337,25 +502,32 @@ export default function Classroom({ onEndSession }: ClassroomProps) {
         };
 
         utterance.onend = () => {
+          clearTimeout(safetyTimeout);
+          clearInterval(progressInterval);
           setStepSpeakingComplete(true);
           setSpeechProgress(1);
         };
         utterance.onerror = () => {
+          clearTimeout(safetyTimeout);
+          clearInterval(progressInterval);
           setStepSpeakingComplete(true);
           setSpeechProgress(1);
         };
-        
-        const wordCount = cleanSpokenText.split(' ').length;
-        const estimatedDurationMs = (wordCount / 2.5) * 1000;
-        setExpectedDuration(estimatedDurationMs);
-        
+
         // We still calculate a fallback speed, but the primary driver will be speechProgress
         const charsToWrite = Math.max(1, step.whiteboardText.length);
         const calculatedSpeed = (estimatedDurationMs * 0.95) / charsToWrite;
         const adjustedSpeed = calculatedSpeed * 0.8;
         const speed = Math.min(150, Math.max(30, adjustedSpeed));
         setTypingSpeed(speed);
-        
+
+        safetyTimeout = setTimeout(() => {
+          console.warn("Speech safety timeout triggered");
+          clearInterval(progressInterval);
+          setStepSpeakingComplete(true);
+          setSpeechProgress(1);
+        }, estimatedDurationMs + 5000); // 5s buffer
+
         window.speechSynthesis.speak(utterance);
       } else {
         setStepSpeakingComplete(true);
@@ -364,36 +536,192 @@ export default function Classroom({ onEndSession }: ClassroomProps) {
         setExpectedDuration(100);
       }
     }
-  }, [currentStepIndex, steps, startedStepIndex]);
+  }, [
+    currentStepIndex,
+    steps,
+    startedStepIndex,
+    stepDrawings,
+    generatingDiagrams,
+  ]);
 
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
 
   const speakFiller = () => {
-    if ('speechSynthesis' in window) {
+    if ("speechSynthesis" in window) {
       const fillers = [
         "Hmm, let me think about that...",
         "Good question, let's see...",
         "One moment, I'm processing that...",
         "Let me analyze that for you...",
-        "Interesting, let me work on that..."
+        "Interesting, let me work on that...",
       ];
       const randomFiller = fillers[Math.floor(Math.random() * fillers.length)];
       const utterance = new SpeechSynthesisUtterance(randomFiller);
       const voices = window.speechSynthesis.getVoices();
-      const englishVoice = voices.find(v => v.lang.startsWith('en-') && !v.localService) || 
-                           voices.find(v => v.lang.startsWith('en-')) || 
-                           voices[0];
+      const englishVoice =
+        voices.find((v) => v.lang.startsWith("en-") && !v.localService) ||
+        voices.find((v) => v.lang.startsWith("en-")) ||
+        voices[0];
       if (englishVoice) utterance.voice = englishVoice;
       window.speechSynthesis.speak(utterance);
     }
   };
 
+  const generateDiagramWithGemini3 = async (
+    prompt: string,
+    stepIndex: number,
+    sessionId: number,
+  ) => {
+    try {
+      setGeneratingDiagrams((prev) => ({ ...prev, [stepIndex]: true }));
+
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `You are an expert SVG diagram generator. Generate raw SVG code for the following diagram description:
+        
+        DESCRIPTION: ${prompt}
+        
+        CRITICAL: Output ONLY valid SVG code. Do not include markdown formatting like \`\`\`svg.
+        CRITICAL: Do NOT use <g> elements or transform attributes. Apply all coordinates directly to the shapes.
+        CRITICAL: Supported elements are <path>, <rect>, <circle>, <ellipse>, <line>, <text>.
+        
+        Coordinates are relative to a 800x600 canvas. Center the diagram at x:400, y:300.
+        Make it simple, clear, and colorful. Use SVG paths for complex shapes.`,
+      });
+
+      let svgStr = response.text?.trim() || "";
+      // Strip markdown if present
+      svgStr = svgStr.replace(/^```(xml|svg)?\n?/, "").replace(/\n?```$/, "");
+
+      if (svgStr) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(svgStr, "image/svg+xml");
+        const drawings: Drawing[] = [];
+
+        const getNum = (val: string | null, def: number) =>
+          val ? parseFloat(val) : def;
+        const getStr = (val: string | null, def: string) => val || def;
+
+        doc
+          .querySelectorAll(
+            "path, rect, circle, ellipse, line, polyline, polygon, text",
+          )
+          .forEach((el) => {
+            const stroke = getStr(el.getAttribute("stroke"), "black");
+            const strokeWidth = getNum(el.getAttribute("stroke-width"), 2);
+            const fill = getStr(el.getAttribute("fill"), "none");
+
+            if (el.tagName === "path") {
+              drawings.push({
+                type: "path",
+                d: getStr(el.getAttribute("d"), ""),
+                stroke,
+                strokeWidth,
+                fill,
+              });
+            } else if (el.tagName === "polyline" || el.tagName === "polygon") {
+              const points = el.getAttribute("points");
+              if (points) {
+                const d = `M ${points.trim().replace(/\s+/g, " L ")} ${el.tagName === "polygon" ? "Z" : ""}`;
+                drawings.push({ type: "path", d, stroke, strokeWidth, fill });
+              }
+            } else if (el.tagName === "rect") {
+              drawings.push({
+                type: "rect",
+                x: getNum(el.getAttribute("x"), 0),
+                y: getNum(el.getAttribute("y"), 0),
+                width: getNum(el.getAttribute("width"), 0),
+                height: getNum(el.getAttribute("height"), 0),
+                stroke,
+                strokeWidth,
+                fill,
+              });
+            } else if (el.tagName === "circle") {
+              drawings.push({
+                type: "circle",
+                x: getNum(el.getAttribute("cx"), 0),
+                y: getNum(el.getAttribute("cy"), 0),
+                width: getNum(el.getAttribute("r"), 0) * 2,
+                stroke,
+                strokeWidth,
+                fill,
+              });
+            } else if (el.tagName === "ellipse") {
+              drawings.push({
+                type: "ellipse",
+                x: getNum(el.getAttribute("cx"), 0),
+                y: getNum(el.getAttribute("cy"), 0),
+                width: getNum(el.getAttribute("rx"), 0) * 2,
+                height: getNum(el.getAttribute("ry"), 0) * 2,
+                stroke,
+                strokeWidth,
+                fill,
+              });
+            } else if (el.tagName === "line") {
+              drawings.push({
+                type: "line",
+                x: getNum(el.getAttribute("x1"), 0),
+                y: getNum(el.getAttribute("y1"), 0),
+                x2: getNum(el.getAttribute("x2"), 0),
+                y2: getNum(el.getAttribute("y2"), 0),
+                stroke,
+                strokeWidth,
+                fill,
+              });
+            } else if (el.tagName === "text") {
+              drawings.push({
+                type: "text",
+                x: getNum(el.getAttribute("x"), 0),
+                y: getNum(el.getAttribute("y"), 0),
+                fontSize: getNum(el.getAttribute("font-size"), 20),
+                fill: getStr(el.getAttribute("fill"), "black"),
+                text: el.textContent || "",
+              });
+            }
+          });
+
+        if (sessionId === sessionIdRef.current) {
+          setStepDrawings((prev) => ({ ...prev, [stepIndex]: drawings }));
+        }
+      }
+    } catch (error) {
+      console.error("Error generating diagram with Gemini 3:", error);
+    } finally {
+      if (sessionId === sessionIdRef.current) {
+        setGeneratingDiagrams((prev) => ({ ...prev, [stepIndex]: false }));
+      }
+    }
+  };
+
+  useEffect(() => {
+    steps.forEach((step, index) => {
+      if (
+        step.diagramPrompt &&
+        !stepDrawings[index] &&
+        !generatingDiagrams[index]
+      ) {
+        generateDiagramWithGemini3(
+          step.diagramPrompt,
+          index,
+          sessionIdRef.current,
+        );
+      }
+    });
+  }, [steps, stepDrawings, generatingDiagrams]);
+
   const handleSendMessage = async (query: string, image?: string) => {
     if (!query.trim() && !image) return;
-    
+
+    sessionIdRef.current += 1;
+
     const lowerQuery = query.toLowerCase().trim();
-    if (lowerQuery === 'stop' || lowerQuery === 'cancel' || lowerQuery === 'stop talking') {
-      if ('speechSynthesis' in window) {
+    if (
+      lowerQuery === "stop" ||
+      lowerQuery === "cancel" ||
+      lowerQuery === "stop talking"
+    ) {
+      if ("speechSynthesis" in window) {
         window.speechSynthesis.cancel();
       }
       setStepSpeakingComplete(true);
@@ -403,92 +731,108 @@ export default function Classroom({ onEndSession }: ClassroomProps) {
       setSteps([]);
       return;
     }
-    
+
     // Cancel any ongoing speech if user interrupts
-    if ('speechSynthesis' in window) {
+    if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
 
     // Fast Response for simple queries (Client-side only, no API call)
     const simpleResponses: Record<string, string> = {
-      "hello": "Hello! Ready to learn?",
-      "hi": "Hi there! What's on your mind?",
-      "hey": "Hey! How can I help?",
-      "goodbye": "Goodbye! See you next time.",
-      "bye": "Bye! Have a wonderful day.",
+      hello: "Hello! Ready to learn?",
+      hi: "Hi there! What's on your mind?",
+      hey: "Hey! How can I help?",
+      goodbye: "Goodbye! See you next time.",
+      bye: "Bye! Have a wonderful day.",
       "thank you": "You're very welcome!",
-      "thanks": "No problem at all!",
+      thanks: "No problem at all!",
       "how are you": "I'm doing great and ready to teach!",
       "what is your name": "I'm your AI Teacher.",
       "good morning": "Good morning! Ready to start class?",
       "good afternoon": "Good afternoon! What shall we learn?",
-      "good evening": "Good evening! It's never too late to learn."
+      "good evening": "Good evening! It's never too late to learn.",
     };
 
     // Clean punctuation for matching
-    const cleanQuery = lowerQuery.replace(/[.,!?]/g, '');
-    
+    const cleanQuery = lowerQuery.replace(/[.,!?]/g, "");
+
     if (simpleResponses[cleanQuery] && !image && !screenShareOn) {
-       const response = simpleResponses[cleanQuery];
-       setMessages(prev => [...prev, { role: 'user', text: query }, { role: 'ai', text: response }]);
-       
-       if ('speechSynthesis' in window) {
-         const utterance = new SpeechSynthesisUtterance(response);
-         const voices = window.speechSynthesis.getVoices();
-         // Use default Web TTS voice
-         const englishVoice = voices.find(v => v.lang.startsWith('en-') && !v.localService) || 
-                              voices.find(v => v.lang.startsWith('en-')) || 
-                              voices[0];
-         if (englishVoice) utterance.voice = englishVoice;
-         window.speechSynthesis.speak(utterance);
-       }
-       return;
+      const response = simpleResponses[cleanQuery];
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", text: query },
+        { role: "ai", text: response },
+      ]);
+
+      if ("speechSynthesis" in window) {
+        const utterance = new SpeechSynthesisUtterance(response);
+        const voices = window.speechSynthesis.getVoices();
+        // Use default Web TTS voice
+        const englishVoice =
+          voices.find((v) => v.lang.startsWith("en-") && !v.localService) ||
+          voices.find((v) => v.lang.startsWith("en-")) ||
+          voices[0];
+        if (englishVoice) utterance.voice = englishVoice;
+        window.speechSynthesis.speak(utterance);
+      }
+      return;
     }
-    
+
     let capturedImage = image;
     if (!capturedImage && screenShareOn && screenVideoRef.current) {
-      const canvas = document.createElement('canvas');
+      const canvas = document.createElement("canvas");
       canvas.width = screenVideoRef.current.videoWidth;
       canvas.height = screenVideoRef.current.videoHeight;
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext("2d");
       if (ctx) {
-        ctx.drawImage(screenVideoRef.current, 0, 0, canvas.width, canvas.height);
-        capturedImage = canvas.toDataURL('image/jpeg', 0.8);
+        ctx.drawImage(
+          screenVideoRef.current,
+          0,
+          0,
+          canvas.width,
+          canvas.height,
+        );
+        capturedImage = canvas.toDataURL("image/jpeg", 0.8);
       }
     }
-    
-    setMessages(prev => [...prev, { role: 'user', text: query + (capturedImage ? ' [Image]' : '') }]);
-    
+
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", text: query + (capturedImage ? " [Image]" : "") },
+    ]);
+
     setIsProcessing(true);
     speakFiller(); // Speak filler instead of just showing loading spinner
-    
+
     setIsWriting(false);
     setSteps([]);
+    setStepDrawings({});
+    setGeneratingDiagrams({});
     setCurrentStepIndex(-1);
     setStartedStepIndex(-1);
     executingStepRef.current = -1;
     setCurrentHighlight("");
-    
+
     if (capturedImage) {
       setCurrentImage(capturedImage);
       keepImageRef.current = true;
     } else {
       keepImageRef.current = false;
     }
-    
+
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
     }
-    
+
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      
-      // Use gemini-3-flash-preview for images to make it fast, otherwise gemini-2.5-flash
-      let selectedModel = capturedImage ? "gemini-3-flash-preview" : "gemini-2.5-flash";
-      
+
+      // Use gemini-2.5-flash for fast and high-quality diagram generation
+      let selectedModel = "gemini-2.5-flash";
+
       console.log(`Using model: ${selectedModel}`);
-      
+
       const parts: any[] = [
         {
           text: `You are an AI teacher. 
@@ -498,7 +842,10 @@ ${whiteboardText}
 \`\`\`
 
 Conversation History:
-${messages.slice(-6).map(m => `${m.role.toUpperCase()}: ${m.text}`).join('\n')}
+${messages
+  .slice(-6)
+  .map((m) => `${m.role.toUpperCase()}: ${m.text}`)
+  .join("\n")}
 
 The user asks: "${query}". 
 ${capturedImage ? (screenShareOn && !image ? "The user has shared their screen. The image provided is a screenshot of their current screen." : "The user has also uploaded an image which is now displayed on the whiteboard.") : ""}
@@ -571,19 +918,25 @@ If MODE is "whiteboard" (and CLEAR_BOARD is true):
   1. Step 1: Write the topic heading. Use PERMANENT_HIGHLIGHT for the heading. Speak intro.
   2. Step 2: Write the content line-by-line. 
      - CRITICAL: DO NOT WRITE AND DRAW IN THE SAME STEP. 
-     - If a step has WRITTEN text, the DRAW array MUST be empty [].
-     - If a step has a DRAW array, the WRITTEN text MUST be empty "".
+     - CRITICAL: NEVER use emojis in the WRITTEN text. Emojis are strictly forbidden on the whiteboard.
+     - If a step has WRITTEN text, the DIAGRAM_PROMPT MUST be empty "".
+     - If a step has a DIAGRAM_PROMPT, the WRITTEN text MUST be empty "".
      - CRITICAL: You can write text ABOVE and BELOW the diagram. To do this, output the exact token [DIAGRAM] in your WRITTEN text where the diagram should be inserted. Any text written after [DIAGRAM] will appear below the drawing.
      - Example:
        WRITTEN: Here is the diagram: \n [DIAGRAM] \n As you can see above...
      - If "Whole Concept": Write the user's concept line-by-line, explaining each part.
      - If "Topic Question": Write the definition/explanation line-by-line.
-     - CRITICAL: STEP-BY-STEP DIAGRAMS: If explaining a process or algorithm (e.g., Sorting, Mitosis, Engine Cycle), you MUST use multiple steps to show the EVOLUTION of the diagram. 
-       - Step 1: Draw the initial state (provide FULL DRAW array).
-       - Step 2: Draw the state after the first change (e.g., first swap in sorting). Provide a NEW FULL DRAW array representing the updated state.
-       - Step 3: Draw the next state, and so on.
-       - Do NOT just draw one diagram and talk about it. The diagram MUST change visually in each step to match the spoken explanation.
-       - Each step should have a clear SPOKEN explanation of what changed.
+     - CRITICAL: DIAGRAM STRATEGY (Dynamic vs Static):
+       - CASE A: DYNAMIC PROCESSES (e.g., Sorting Algorithms, Mitosis, Engine Cycles, Physics motion):
+         - You MUST use multiple steps to show the EVOLUTION of the diagram.
+         - Step 1: Draw initial state (provide FULL DIAGRAM_PROMPT).
+         - Step 2: Draw updated state (e.g., items swapped). Provide a NEW FULL DIAGRAM_PROMPT.
+         - The diagram MUST change visually in each step to match the spoken explanation.
+       - CASE B: STRUCTURAL/STATIC TOPICS (e.g., Photosynthesis, Anatomy, Maps, System Architecture, "What is X"):
+         - Use a SINGLE, comprehensive diagram.
+         - Draw it ONCE at the beginning or relevant step.
+         - Do NOT generate a new diagram for subsequent steps unless the view completely changes.
+         - For subsequent steps, keep the DIAGRAM_PROMPT empty ("") so the previous diagram remains visible while you write text about it.
      - CRITICAL: Do NOT write "Definition:".
      - CRITICAL: Break content into small, digestible lines.
      - SPOKEN TEXT RULE: The SPOKEN text must closely match the WRITTEN text. Say EXACTLY what you are writing, plus a very brief explanation. Do NOT write one thing and speak about something else. Sync is critical.
@@ -594,7 +947,7 @@ If MODE is "whiteboard" (and CLEAR_BOARD is true):
   Follow "The Physics Structure":
   I. Setup (The Model)
      - Givens & Goal: List known variables (v, m, theta) and what you need to find.
-     - Diagram: Draw a Free Body Diagram (FBD) or circuit schematic using DRAW (SVG shapes).
+     - Diagram: Draw a Free Body Diagram (FBD) or circuit schematic using DIAGRAM_PROMPT.
      - Assumptions: State constraints (e.g., "Vacuum," "Frictionless," "Point mass").
   II. The Law (The Weapon)
      - Principle: State the governing law (e.g., Newton's 2nd Law, Conservation of Energy).
@@ -613,7 +966,7 @@ If MODE is "whiteboard" (and CLEAR_BOARD is true):
   Follow "The Math Structure":
   I. Setup (The Premise)
      - Given & Goal: Define the starting conditions and what to prove or find.
-     - Visual: Sketch the graph, geometric figure, or define the domain using DRAW (SVG shapes).
+     - Visual: Sketch the graph, geometric figure, or define the domain using DIAGRAM_PROMPT.
   II. The Strategy (The Tool)
      - Method: Select the specific Theorem or Technique (e.g., "Pythagorean Theorem," "Integration by Parts," "Induction").
   III. Execution (The Logic)
@@ -626,76 +979,61 @@ If MODE is "whiteboard" (and CLEAR_BOARD is true):
      - Conclusion: Box the final answer clearly.
      - Q.E.D.: Mark the proof complete.
 
-  3. Step 3: Write the formula or key code example (if applicable). Speak an explanation while writing it.
+  3. CODING TASKS (COMPLEXITY CLASSIFICATION):
+     - If the user asks for code, you MUST classify whether the problem is COMPLEX or SIMPLE.
+     - COMPLEX problems (e.g., algorithms, data structures, full components): 
+       - FIRST, write the algorithm, approach, or architecture on the whiteboard.
+       - THEN, switch to the code editor to write the actual code.
+     - SIMPLE problems (e.g., basic syntax, simple functions, CSS tweaks):
+       - Skip the whiteboard algorithm and directly provide the code in the code editor.
+     - Use the MODE field to switch between 'whiteboard' and 'code'.
   4. Step 4: Ask if they have questions. ONLY speak this. DO NOT write anything.
   5. HIGHLIGHTING: 
-     - Use the HIGHLIGHT field to emphasize key terms TEMPORARILY as you explain them.
-     - Use the PERMANENT_HIGHLIGHT field to PERMANENTLY highlight key terms.
-     - Use HIGHLIGHT for topic headlines instead of underlining.
-     - CRITICAL: DO NOT use XML or HTML tags like <PERMANENT_HIGHLIGHT> or <HIGHLIGHT> in the WRITTEN text. Just output the plain text in WRITTEN, and put the word you want to highlight in the HIGHLIGHT or PERMANENT_HIGHLIGHT field.
-  6. DRAWING:
-     - Use the DRAW field to create diagrams.
-     - CRITICAL: To show an evolving diagram (like a sorting algorithm), you MUST provide a NEW, COMPLETE DRAW array in each step that shows the new state. Do not just draw it once. Each step's DRAW array will be rendered as a separate diagram below the text for that step.
-     - CRITICAL: Make the diagram COLORFUL. You MUST use 'stroke' and 'fill' properties with vibrant colors.
-     - CRITICAL: SIZE ACCORDING TO COMPLEXITY:
-       1. SIMPLE DIAGRAMS (1-3 shapes, e.g., a triangle, a circle, a single force): Make them HUGE. Center them and use 60-80% of the canvas height (e.g., width 500-600px).
-       2. MEDIUM DIAGRAMS (4-8 shapes, e.g., a simple circuit, a flowchart with 3-4 steps): Make them LARGE but leave room for labels. Use 50-60% of canvas (e.g., width 400-500px).
-       3. COMPLEX DIAGRAMS (Many shapes, detailed graphs, complex circuits): Make them FIT comfortably. Use 40-50% of canvas (e.g., width 300-400px) to ensure nothing is cut off and labels are readable.
-     - CRITICAL: Center all diagrams at x:400, y:300.
-     - CRITICAL: For hollow shapes, orbits, or boundaries, you MUST use \`"fill": "none"\`.
-     - CRITICAL: By default, \`fill\` creates a solid color. If you want a hollow shape, you MUST add \`"fill": "none"\`.
-     - CRITICAL: Always include 'arrow' types to show flow or connections.
-     - CRITICAL: Always include 'text' types to label the parts of your diagram.
-     - CRITICAL: Output a JSON array of drawing objects.
-     - Supported types: "rect", "circle", "ellipse", "line", "arrow", "text", "path".
-     - Format examples:
-       - Rect: {"type": "rect", "x": 200, "y": 150, "width": 400, "height": 300, "stroke": "blue", "fill": "lightblue"}
-       - Circle (Solid): {"type": "circle", "x": 400, "y": 300, "width": 150, "stroke": "black", "fill": "black"}
-       - Circle (Orbit/Hollow): {"type": "circle", "x": 400, "y": 300, "width": 400, "stroke": "gray", "fill": "none"}
-       - Line: {"type": "line", "x": 200, "y": 300, "x2": 600, "y2": 300, "stroke": "orange"}
-       - Arrow: {"type": "arrow", "x": 200, "y": 300, "x2": 600, "y2": 300, "stroke": "red"}
-       - Text: {"type": "text", "x": 400, "y": 280, "text": "Label", "fontSize": 24, "fill": "black"}
-       - Path: {"d": "M10 10 ...", "stroke": "purple"} (for complex custom shapes)
-     - Coordinates are relative to a 800x600 canvas.
-     - CRITICAL: For simple shapes, patterns, or geometry, use basic shapes ("rect", "circle", "line", etc.) which will be rendered as standard SVG.
-     - CRITICAL: For complex, theoretical, or scientific diagrams (e.g., biology, chemistry, anatomy, physics phenomena), you MUST use SVG paths ("path" type with a detailed "d" attribute) to draw realistic and detailed illustrations. Do not try to build complex scientific diagrams out of simple circles and rectangles.
+     - CRITICAL: Do NOT use the HIGHLIGHT field for keywords, terms, or anything in the middle of the text.
+     - ONLY use PERMANENT_HIGHLIGHT for the Main Topic Heading at the start.
+     - Do NOT use the HIGHLIGHT field for anything else.
+     - CRITICAL: DO NOT use XML or HTML tags like <PERMANENT_HIGHLIGHT> or <HIGHLIGHT> in the WRITTEN text. Just output the plain text in WRITTEN, and put the word you want to highlight in the PERMANENT_HIGHLIGHT field.
+  6. DRAWING (D3.js SVG Generation):
+     - You do NOT generate the SVG JSON directly.
+     - Instead, use the DIAGRAM_PROMPT field to describe exactly what diagram should be drawn for this step.
+     - Provide a highly detailed description of the shapes, layout, colors, and labels needed.
+     - Example: 
+       DIAGRAM_PROMPT: A simple diagram of a plant cell. A large green rectangle for the cell wall, a blue circle for the nucleus, and labels pointing to them.
+     - If no diagram is needed, leave the DIAGRAM_PROMPT field empty or omit it.
      - NEVER use SVG for math equations. Use simple text (pen).
-     
-     ELECTRONIC COMPONENTS (Circuit Diagrams):
-     - Use "path" type for components.
-     - Resistor (Zig-zag): "M0 0 L10 -10 L20 10 L30 -10 L40 10 L50 0" (Scale/Translate as needed)
-     - Capacitor (Parallel plates): "M0 -15 L0 15 M10 -15 L10 15" (Gap 10)
-     - Battery (DC Source): "M0 -15 L0 15 M10 -7 L10 7" (Long bar +, Short bar -)
-     - Inductor (Loops): "M0 0 Q10 -20 20 0 Q30 -20 40 0 Q50 -20 60 0"
-     - Switch: "M0 0 L20 -10" (Open)
-     - Ground: "M0 0 L30 0 M5 5 L25 5 M10 10 L20 10"
-     - Connect components with "line" type.
-     - Label components (R1, C1, V1) using "text" type.
   
   Example:
   ===STEP===
   SPOKEN: Let's look at a triangle.
   WRITTEN: Triangle Properties
-  DRAW: [{"type": "line", "x": 50, "y": 150, "x2": 150, "y2": 150}, {"type": "line", "x": 150, "y": 150, "x2": 100, "y2": 50}, {"type": "line", "x": 100, "y": 50, "x2": 50, "y2": 150}, {"type": "text", "x": 90, "y": 160, "text": "Base"}]
-  HIGHLIGHT: Triangle Properties
-  PERMANENT_HIGHLIGHT: 
+  DIAGRAM_PROMPT: A simple triangle with a label "Base" at the bottom.
+  HIGHLIGHT: 
+  PERMANENT_HIGHLIGHT: Triangle Properties
   ===STEP===
 
 - If the user asks for code, follow this Methodology:
   
   CRITICAL FOR CODING:
-  - You MUST use a strict TWO-TURN approach for ALL coding tasks (simple or complex).
-  - NEVER write actual code on the whiteboard.
+  - You MUST classify whether the coding problem is COMPLEX or SIMPLE.
   
-  - TURN 1: SETUP & ALGORITHM
-    - MODE: whiteboard
-    - CLEAR_BOARD: true
-    - Write the Question or Aim on the whiteboard.
-    - If it's a complex topic, ALSO write the step-by-step Algorithm or Logic Flow.
-    - Explain the logic step-by-step.
-    - End by asking: "Shall I write the code now?"
-  
-  - TURN 2: IMPLEMENTATION (Wait for user to say "Yes" or "Ready")
+  - COMPLEX PROBLEMS (e.g., algorithms, data structures, full components, logic-heavy tasks):
+    - Use a TWO-TURN approach.
+    - TURN 1: SETUP & ALGORITHM
+      - MODE: whiteboard
+      - CLEAR_BOARD: true
+      - Write the Question or Aim on the whiteboard.
+      - Write the step-by-step Algorithm or Logic Flow.
+      - Explain the logic step-by-step.
+      - End by asking: "Shall I write the code now?"
+    - TURN 2: IMPLEMENTATION (Wait for user to say "Yes" or "Ready")
+      - MODE: code
+      - LANGUAGE: <specify language>
+      - CLEAR_BOARD: true
+      - Follow the "Live Coding Flow" below.
+
+  - SIMPLE PROBLEMS (e.g., basic syntax, simple functions, CSS tweaks, one-liners):
+    - Skip the whiteboard algorithm.
+    - Go DIRECTLY to the code editor in a SINGLE TURN.
     - MODE: code
     - LANGUAGE: <specify language>
     - CLEAR_BOARD: true
@@ -734,84 +1072,110 @@ CLEAR_BOARD: true
 ===STEP===
 SPOKEN: Our aim is to add two numbers.
 WRITTEN: # Aim: Add two numbers
-DRAW: 
+DIAGRAM_PROMPT: 
 HIGHLIGHT: 
 PERMANENT_HIGHLIGHT: 
 ===STEP===
 ...
-`
-        }
+`,
+        },
       ];
 
       if (capturedImage) {
         // Remove data URL prefix
-        const base64Data = capturedImage.split(',')[1];
+        const base64Data = capturedImage.split(",")[1];
         parts.push({
           inlineData: {
             mimeType: "image/jpeg",
-            data: base64Data
-          }
+            data: base64Data,
+          },
         });
       }
 
+      const currentSessionId = sessionIdRef.current;
+
       const responseStream = await ai.models.generateContentStream({
         model: selectedModel,
-        contents: [{ role: 'user', parts: parts }]
+        contents: [{ role: "user", parts: parts }],
       });
-      
+
       let fullText = "";
       let chatActionParsed = false;
       let modeParsed = false;
       let languageParsed = false;
       let clearBoardParsed = false;
-      
+
       setAwaitingConfirmation(false);
-      
+
       const parseStep = (block: string) => {
-        const spokenMatch = block.match(/SPOKEN:\s*(.*?)(?=WRITTEN:|DRAW:|HIGHLIGHT:|PERMANENT_HIGHLIGHT:|$)/s);
-        const writtenMatch = block.match(/WRITTEN:\s*(.*?)(?=DRAW:|HIGHLIGHT:|PERMANENT_HIGHLIGHT:|$)/s);
-        const drawMatch = block.match(/DRAW:\s*(.*?)(?=HIGHLIGHT:|PERMANENT_HIGHLIGHT:|$)/s);
-        const highlightMatch = block.match(/HIGHLIGHT:\s*(.*?)(?=PERMANENT_HIGHLIGHT:|$)/s);
-        const permHighlightMatch = block.match(/PERMANENT_HIGHLIGHT:\s*(.*?)$/s);
-        
+        const spokenMatch = block.match(
+          /SPOKEN:\s*(.*?)(?=WRITTEN:|DIAGRAM_PROMPT:|HIGHLIGHT:|PERMANENT_HIGHLIGHT:|$)/s,
+        );
+        const writtenMatch = block.match(
+          /WRITTEN:\s*(.*?)(?=DIAGRAM_PROMPT:|HIGHLIGHT:|PERMANENT_HIGHLIGHT:|$)/s,
+        );
+        const diagramPromptMatch = block.match(
+          /DIAGRAM_PROMPT:\s*(.*?)(?=HIGHLIGHT:|PERMANENT_HIGHLIGHT:|$)/s,
+        );
+        const highlightMatch = block.match(
+          /HIGHLIGHT:\s*(.*?)(?=PERMANENT_HIGHLIGHT:|$)/s,
+        );
+        const permHighlightMatch = block.match(
+          /PERMANENT_HIGHLIGHT:\s*(.*?)$/s,
+        );
+
         if (!spokenMatch) return null;
 
+        let diagramPrompt = diagramPromptMatch
+          ? diagramPromptMatch[1].trim()
+          : undefined;
+
         let drawings: Drawing[] = [];
-        if (drawMatch && drawMatch[1].trim()) {
-          try {
-            drawings = JSON.parse(drawMatch[1].trim());
-          } catch (e) {
-            // If it's not valid JSON yet (streaming), ignore it
-          }
-        }
 
         let whiteboardText = writtenMatch ? writtenMatch[1].trim() : "";
         // Strip any accidental XML tags the AI might hallucinate
-        whiteboardText = whiteboardText.replace(/<\/?(PERMANENT_HIGHLIGHT|HIGHLIGHT)>/gi, '');
+        whiteboardText = whiteboardText.replace(
+          /<\/?(PERMANENT_HIGHLIGHT|HIGHLIGHT)>/gi,
+          "",
+        );
 
-        let permHighlight = permHighlightMatch ? permHighlightMatch[1].trim() : "";
-        permHighlight = permHighlight.replace(/<\/?(PERMANENT_HIGHLIGHT|HIGHLIGHT)>/gi, '');
+        let permHighlight = permHighlightMatch
+          ? permHighlightMatch[1].trim()
+          : "";
+        permHighlight = permHighlight.replace(
+          /<\/?(PERMANENT_HIGHLIGHT|HIGHLIGHT)>/gi,
+          "",
+        );
 
         let highlight = highlightMatch ? highlightMatch[1].trim() : "";
-        highlight = highlight.replace(/<\/?(PERMANENT_HIGHLIGHT|HIGHLIGHT)>/gi, '');
+        highlight = highlight.replace(
+          /<\/?(PERMANENT_HIGHLIGHT|HIGHLIGHT)>/gi,
+          "",
+        );
 
         return {
           spokenText: spokenMatch[1].trim(),
           whiteboardText,
           highlightText: highlight,
           permanentHighlight: permHighlight,
-          drawings
+          drawings,
+          diagramPrompt,
         };
       };
 
       for await (const chunk of responseStream) {
+        if (currentSessionId !== sessionIdRef.current) {
+          console.log("Session changed, aborting stream processing.");
+          return;
+        }
+
         fullText += chunk.text;
-        
+
         if (!chatActionParsed) {
           const actionMatch = fullText.match(/CHAT_ACTION:\s*(.*?)(?=\n|$)/i);
           if (actionMatch) {
             const action = actionMatch[1].trim();
-            setMessages(prev => [...prev, { role: 'ai', text: action }]);
+            setMessages((prev) => [...prev, { role: "ai", text: action }]);
             chatActionParsed = true;
           }
         }
@@ -819,7 +1183,9 @@ PERMANENT_HIGHLIGHT:
         if (!modeParsed) {
           const modeMatch = fullText.match(/MODE:\s*(whiteboard|code)/i);
           if (modeMatch) {
-            setPresentationMode(modeMatch[1].toLowerCase() as 'whiteboard' | 'code');
+            setPresentationMode(
+              modeMatch[1].toLowerCase() as "whiteboard" | "code",
+            );
             modeParsed = true;
           }
         }
@@ -828,7 +1194,7 @@ PERMANENT_HIGHLIGHT:
           const langMatch = fullText.match(/LANGUAGE:\s*([a-zA-Z0-9_-]+)/i);
           if (langMatch) {
             const lang = langMatch[1].toLowerCase();
-            if (lang !== 'none') {
+            if (lang !== "none") {
               setCodeLanguage(lang);
             }
             languageParsed = true;
@@ -838,90 +1204,131 @@ PERMANENT_HIGHLIGHT:
         if (!clearBoardParsed) {
           const clearMatch = fullText.match(/CLEAR_BOARD:\s*(true|false)/i);
           if (clearMatch) {
-            const shouldClear = clearMatch[1].toLowerCase() === 'true';
-            if (shouldClear && (whiteboardText.trim() || currentDrawings.length > 0)) {
-              setSlideHistory(prev => [...prev, {
-                id: Date.now().toString(),
-                mode: presentationMode,
-                text: whiteboardText,
-                drawings: currentDrawings,
-                diagrams: currentDiagrams,
-                image: currentImage,
-                language: codeLanguage,
-                permanentHighlights: permanentHighlights
-              }]);
+            const shouldClear = clearMatch[1].toLowerCase() === "true";
+            if (
+              shouldClear &&
+              (whiteboardText.trim() || currentDrawings.length > 0)
+            ) {
+              setSlideHistory((prev) => [
+                ...prev,
+                {
+                  id: Date.now().toString(),
+                  mode: presentationMode,
+                  text: whiteboardText,
+                  drawings: currentDrawings,
+                  diagrams: currentDiagrams,
+                  image: currentImage,
+                  language: codeLanguage,
+                  permanentHighlights: permanentHighlights,
+                },
+              ]);
             }
             clearBoardRef.current = shouldClear;
             clearBoardParsed = true;
           }
         }
-        
-        const stepBlocks = fullText.split('===STEP===');
+
+        const stepBlocks = fullText.split("===STEP===");
         if (stepBlocks.length > 1) {
           const completeSteps: any[] = [];
           for (let i = 1; i < stepBlocks.length - 1; i++) {
             const step = parseStep(stepBlocks[i].trim());
             if (step) {
               // Strictly separate writing and drawing if AI accidentally combines them
-              if (step.whiteboardText && step.drawings && step.drawings.length > 0) {
+              if (
+                step.whiteboardText &&
+                step.drawings &&
+                step.drawings.length > 0
+              ) {
                 completeSteps.push({ ...step, drawings: [] });
-                completeSteps.push({ spokenText: "", whiteboardText: "", highlightText: "", permanentHighlight: "", drawings: step.drawings });
+                completeSteps.push({
+                  spokenText: "",
+                  whiteboardText: "",
+                  highlightText: "",
+                  permanentHighlight: "",
+                  drawings: step.drawings,
+                });
               } else {
                 completeSteps.push(step);
               }
             }
           }
-          
+
           if (completeSteps.length > 0) {
             setSteps(completeSteps);
             setIsProcessing(false);
           }
         }
       }
-      
-      const finalStepBlocks = fullText.split('===STEP===');
+
+      if (currentSessionId !== sessionIdRef.current) return;
+
+      const finalStepBlocks = fullText.split("===STEP===");
       const finalSteps: any[] = [];
       for (let i = 1; i < finalStepBlocks.length; i++) {
         const step = parseStep(finalStepBlocks[i].trim());
         if (step) {
-          if (step.whiteboardText && step.drawings && step.drawings.length > 0) {
+          if (
+            step.whiteboardText &&
+            step.drawings &&
+            step.drawings.length > 0
+          ) {
             finalSteps.push({ ...step, drawings: [] });
-            finalSteps.push({ spokenText: "", whiteboardText: "", highlightText: "", permanentHighlight: "", drawings: step.drawings });
+            finalSteps.push({
+              spokenText: "",
+              whiteboardText: "",
+              highlightText: "",
+              permanentHighlight: "",
+              drawings: step.drawings,
+            });
           } else {
             finalSteps.push(step);
           }
         }
       }
-      
+
       if (finalSteps.length > 0) {
         setSteps(finalSteps);
-        
+
         const lastStep = finalSteps[finalSteps.length - 1];
-        if (lastStep.spokenText && (lastStep.spokenText.toLowerCase().includes("shall i write") || lastStep.spokenText.toLowerCase().includes("whiteboard"))) {
+        if (
+          lastStep.spokenText &&
+          (lastStep.spokenText.toLowerCase().includes("shall i write") ||
+            lastStep.spokenText.toLowerCase().includes("whiteboard"))
+        ) {
           setAwaitingConfirmation(true);
         }
-        
-        const responseSummary = finalSteps.map(s => s.spokenText).join(' ');
-        setSessionHistory(prev => [...prev, {
-          timestamp: new Date().toLocaleTimeString(),
-          query: query,
-          response: responseSummary.substring(0, 100) + (responseSummary.length > 100 ? '...' : '')
-        }]);
+
+        const responseSummary = finalSteps.map((s) => s.spokenText).join(" ");
+        setSessionHistory((prev) => [
+          ...prev,
+          {
+            timestamp: new Date().toLocaleTimeString(),
+            query: query,
+            response:
+              responseSummary.substring(0, 100) +
+              (responseSummary.length > 100 ? "..." : ""),
+          },
+        ]);
       }
-      
+
       setIsProcessing(false);
-      
     } catch (error: any) {
-      if (error?.type === 'cancelation' || error?.message?.includes('canceled')) {
+      if (
+        error?.type === "cancelation" ||
+        error?.message?.includes("canceled")
+      ) {
         console.log("AI request was canceled or aborted.");
         setIsProcessing(false);
         return;
       }
       console.error("Error generating response:", error);
-      setSteps([{
-        spokenText: "Sorry, an error occurred while processing your request.",
-        whiteboardText: "Error."
-      }]);
+      setSteps([
+        {
+          spokenText: "Sorry, an error occurred while processing your request.",
+          whiteboardText: "Error.",
+        },
+      ]);
       setIsProcessing(false);
     }
   };
@@ -934,64 +1341,111 @@ PERMANENT_HIGHLIGHT:
 
   const handleEndCall = async () => {
     if (stream) {
-      stream.getTracks().forEach(track => track.stop());
+      stream.getTracks().forEach((track) => track.stop());
     }
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
-    if ('speechSynthesis' in window) {
+    if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
-    
+
     const highestId = window.setTimeout(() => {}, 0);
     for (let i = 0; i < highestId; i++) {
       window.clearTimeout(i);
     }
-    
+
     setStepSpeakingComplete(true);
     setStepWritingComplete(true);
     setIsProcessing(false);
     setIsWriting(false);
     setMicOn(false);
-    
+
     setCallEnded(true);
     onEndSession();
   };
 
   const generatePDF = async () => {
     setIsGeneratingPDF(true);
-    
+
     // Give React a tick to render the hidden container
     setTimeout(async () => {
       try {
-        // Use a more stable initialization of jsPDF
-        const pdf = new jsPDF({
-          orientation: 'landscape',
-          unit: 'px',
-          format: [800, 600],
-          compress: true
-        });
-
+        let pdf: jsPDF | null = null;
         let pageAdded = false;
 
         // Function to safely add an image to PDF
         const addElementToPdf = async (el: HTMLElement) => {
           try {
+            // Get full scroll height to capture everything
+            const elHeight = Math.max(el.scrollHeight, 600);
+            const padding = 40; // Add padding to the PDF page
+            const contentWidth = 800;
+            const contentHeight = elHeight;
+            const pdfWidth = contentWidth + padding * 2;
+            const pdfHeight = contentHeight + padding * 2;
+
             // html-to-image can sometimes fail with complex CSS, so we use a safe approach
-            const dataUrl = await toPng(el, { 
-              backgroundColor: '#ffffff', 
-              width: 800, 
-              height: 600,
+            const dataUrl = await toPng(el, {
+              backgroundColor: "#ffffff",
+              width: contentWidth,
+              height: contentHeight,
               style: {
                 // Force standard colors to avoid oklch issues in the capture process
-                color: '#000000'
-              }
+                color: "#000000",
+                transform: "scale(1)", // Reset zoom for capture
+                transformOrigin: "top left",
+                padding: "20px", // Add internal padding to the element capture
+              },
             });
-            
-            if (pageAdded) pdf.addPage();
-            // Use 'JPEG' and quality to reduce size and avoid some parsing issues
-            pdf.addImage(dataUrl, 'PNG', 0, 0, 800, 600, undefined, 'FAST');
+
+            if (!pdf) {
+              // Initialize PDF with padding dimensions
+              pdf = new jsPDF({
+                orientation: pdfHeight > pdfWidth ? "portrait" : "landscape",
+                unit: "px",
+                format: [pdfWidth, pdfHeight],
+                compress: true,
+              });
+            } else {
+              pdf.addPage(
+                [pdfWidth, pdfHeight],
+                pdfHeight > pdfWidth ? "portrait" : "landscape",
+              );
+              pdf.setPage(pdf.getNumberOfPages());
+            }
+
+            // Add image with padding offset
+            // Use 'PNG' and quality to reduce size and avoid some parsing issues
+            pdf.addImage(
+              dataUrl,
+              "PNG",
+              padding,
+              padding,
+              contentWidth,
+              contentHeight,
+              undefined,
+              "FAST",
+            );
+
+            // Add page border/structure
+            pdf.setDrawColor(200, 200, 200);
+            pdf.rect(
+              padding - 10,
+              padding - 10,
+              contentWidth + 20,
+              contentHeight + 20,
+            );
+
+            // Add footer with page number
+            const pageCount = pdf.getNumberOfPages();
+            pdf.setFontSize(10);
+            pdf.setTextColor(100, 100, 100);
+            pdf.text(`Page ${pageCount}`, pdfWidth / 2, pdfHeight - 15, {
+              align: "center",
+            });
+
             pageAdded = true;
           } catch (err) {
             console.error("Error capturing element for PDF:", err);
@@ -1007,18 +1461,25 @@ PERMANENT_HIGHLIGHT:
         }
 
         // Then capture the current board
-        const currentElement = document.getElementById(presentationMode === 'code' ? 'codeboard-content' : 'whiteboard-content');
-        if (currentElement && (whiteboardText.trim() || currentDrawings.length > 0)) {
+        const currentElement = document.getElementById(
+          presentationMode === "code"
+            ? "codeboard-content"
+            : "whiteboard-content",
+        );
+        if (
+          currentElement &&
+          (whiteboardText.trim() || currentDrawings.length > 0)
+        ) {
           const originalBg = currentElement.style.backgroundColor;
-          currentElement.style.backgroundColor = '#ffffff';
-          
+          currentElement.style.backgroundColor = "#ffffff";
+
           await addElementToPdf(currentElement);
-          
+
           currentElement.style.backgroundColor = originalBg;
         }
 
-        if (pageAdded) {
-          pdf.save('class-notes.pdf');
+        if (pdf && pageAdded) {
+          pdf.save("class-notes.pdf");
         } else {
           alert("No content to save.");
         }
@@ -1037,46 +1498,45 @@ PERMANENT_HIGHLIGHT:
         <h1 className="text-4xl text-white mb-8">You left the meeting</h1>
         <div className="flex flex-col gap-4 items-center">
           <div className="flex gap-4 mb-8">
-             <button 
+            <button
               onClick={generatePDF}
               className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-md font-medium transition-colors flex items-center gap-2"
             >
               <Download className="w-5 h-5" />
               Download Class Notes (PDF)
             </button>
-
           </div>
-          
+
           <div className="flex gap-4">
-            <button 
-              onClick={() => window.location.reload()} 
+            <button
+              onClick={() => window.location.reload()}
               className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium transition-colors"
             >
               Rejoin
             </button>
-            <button 
-              onClick={onEndSession} 
+            <button
+              onClick={onEndSession}
               className="px-6 py-2 bg-transparent hover:bg-[#3c4043] text-blue-400 rounded-md font-medium transition-colors"
             >
               Return to home screen
             </button>
           </div>
         </div>
-        
+
         <div className="absolute top-0 left-0 -z-50 opacity-0 pointer-events-none">
-           {(whiteboardText.length > 0) && (
-              <Whiteboard 
-                text={whiteboardText} 
-                isWriting={false} 
-                onWritingComplete={() => {}}
-                typingSpeed={0}
-                highlightText=""
-                permanentHighlights={permanentHighlights}
-                drawings={currentDrawings}
-                diagrams={currentDiagrams}
-                image={currentImage}
-              />
-           )}
+          {whiteboardText.length > 0 && (
+            <Whiteboard
+              text={whiteboardText}
+              isWriting={false}
+              onWritingComplete={() => {}}
+              typingSpeed={0}
+              highlightText=""
+              permanentHighlights={permanentHighlights}
+              drawings={currentDrawings}
+              diagrams={currentDiagrams}
+              image={currentImage}
+            />
+          )}
         </div>
       </div>
     );
@@ -1086,12 +1546,12 @@ PERMANENT_HIGHLIGHT:
     <div className="h-screen w-full bg-[#202124] flex flex-col font-sans overflow-hidden">
       <div className="flex-1 flex p-2 md:p-4 pb-0 overflow-hidden relative">
         <div className="flex-1 h-full relative flex flex-col md:flex-row gap-4">
-          {presentationMode !== 'none' && (
+          {presentationMode !== "none" && (
             <div className="flex-[3] h-full relative transition-all duration-500 ease-in-out group">
-              {presentationMode === 'whiteboard' ? (
-                <Whiteboard 
-                  text={whiteboardText} 
-                  isWriting={isWriting} 
+              {presentationMode === "whiteboard" ? (
+                <Whiteboard
+                  text={whiteboardText}
+                  isWriting={isWriting}
                   onWritingComplete={handleWritingComplete}
                   typingSpeed={typingSpeed}
                   syncProgress={speechProgress}
@@ -1102,9 +1562,9 @@ PERMANENT_HIGHLIGHT:
                   image={currentImage}
                 />
               ) : (
-                <CodeBoard 
-                  text={whiteboardText} 
-                  isWriting={isWriting} 
+                <CodeBoard
+                  text={whiteboardText}
+                  isWriting={isWriting}
                   onWritingComplete={handleWritingComplete}
                   expectedDuration={expectedDuration}
                   syncProgress={speechProgress}
@@ -1112,7 +1572,7 @@ PERMANENT_HIGHLIGHT:
                   language={codeLanguage}
                 />
               )}
-              
+
               {/* Floating Download Button */}
               <button
                 onClick={generatePDF}
@@ -1124,30 +1584,44 @@ PERMANENT_HIGHLIGHT:
               </button>
             </div>
           )}
-          
-          <div className={`flex gap-4 transition-all duration-500 ease-in-out ${
-            presentationMode !== 'none' 
-              ? 'flex-row md:flex-col h-auto md:h-full flex-1 md:max-w-[300px]' 
-              : 'flex-col md:flex-row flex-1 justify-center items-center'
-          }`}>
-            <div className={`relative bg-[#3c4043] rounded-xl overflow-hidden shadow-lg aspect-video flex-1 border border-gray-700 flex items-center justify-center ${
-              presentationMode !== 'none' ? 'max-h-[150px] md:max-h-[50%]' : 'max-w-full md:max-w-2xl w-full'
-            }`}>
-              <div className={`w-24 h-24 rounded-full bg-blue-500 flex items-center justify-center ${isProcessing || currentStepIndex >= 0 ? 'animate-pulse' : ''}`}>
+
+          <div
+            className={`flex gap-4 transition-all duration-500 ease-in-out ${
+              presentationMode !== "none"
+                ? "flex-row md:flex-col h-auto md:h-full flex-1 md:max-w-[300px]"
+                : "flex-col md:flex-row flex-1 justify-center items-center"
+            }`}
+          >
+            <div
+              className={`relative bg-[#3c4043] rounded-xl overflow-hidden shadow-lg aspect-video flex-1 border border-gray-700 flex items-center justify-center ${
+                presentationMode !== "none"
+                  ? "max-h-[150px] md:max-h-[50%]"
+                  : "max-w-full md:max-w-2xl w-full"
+              }`}
+            >
+              <div
+                className={`w-24 h-24 rounded-full bg-blue-500 flex items-center justify-center ${isProcessing || currentStepIndex >= 0 ? "animate-pulse" : ""}`}
+              >
                 <MonitorUp size={40} className="text-white" />
               </div>
-              <div className="absolute bottom-3 left-3 bg-black/50 px-2 py-1 rounded text-sm text-white">AI Teacher</div>
+              <div className="absolute bottom-3 left-3 bg-black/50 px-2 py-1 rounded text-sm text-white">
+                AI Teacher
+              </div>
             </div>
 
-            <div className={`relative bg-[#3c4043] rounded-xl overflow-hidden shadow-lg aspect-video flex-1 border border-gray-700 ${
-              presentationMode !== 'none' ? 'max-h-[150px] md:max-h-[50%]' : 'max-w-full md:max-w-2xl w-full'
-            }`}>
+            <div
+              className={`relative bg-[#3c4043] rounded-xl overflow-hidden shadow-lg aspect-video flex-1 border border-gray-700 ${
+                presentationMode !== "none"
+                  ? "max-h-[150px] md:max-h-[50%]"
+                  : "max-w-full md:max-w-2xl w-full"
+              }`}
+            >
               {videoOn ? (
-                <video 
-                  ref={videoRef} 
-                  autoPlay 
-                  playsInline 
-                  muted 
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
                   className="w-full h-full object-cover transform scale-x-[-1]"
                 />
               ) : (
@@ -1157,97 +1631,117 @@ PERMANENT_HIGHLIGHT:
                   </div>
                 </div>
               )}
-              <div className="absolute bottom-3 left-3 bg-black/50 px-2 py-1 rounded text-sm text-white">You</div>
+              <div className="absolute bottom-3 left-3 bg-black/50 px-2 py-1 rounded text-sm text-white">
+                You
+              </div>
             </div>
-            
+
             {screenShareOn && (
-              <div className={`relative bg-[#3c4043] rounded-xl overflow-hidden shadow-lg aspect-video flex-1 border border-gray-700 ${
-                presentationMode !== 'none' ? 'max-h-[150px] md:max-h-[50%]' : 'max-w-full md:max-w-2xl w-full'
-              }`}>
-                <video 
-                  ref={screenVideoRef} 
-                  autoPlay 
-                  playsInline 
-                  muted 
+              <div
+                className={`relative bg-[#3c4043] rounded-xl overflow-hidden shadow-lg aspect-video flex-1 border border-gray-700 ${
+                  presentationMode !== "none"
+                    ? "max-h-[150px] md:max-h-[50%]"
+                    : "max-w-full md:max-w-2xl w-full"
+                }`}
+              >
+                <video
+                  ref={screenVideoRef}
+                  autoPlay
+                  playsInline
+                  muted
                   className="w-full h-full object-contain"
                 />
-                <div className="absolute bottom-3 left-3 bg-black/50 px-2 py-1 rounded text-sm text-white">Your Screen</div>
+                <div className="absolute bottom-3 left-3 bg-black/50 px-2 py-1 rounded text-sm text-white">
+                  Your Screen
+                </div>
               </div>
             )}
           </div>
-          
+
           {ccOn && whiteboardText && (
             <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-black/70 text-white px-6 py-3 rounded-lg max-w-2xl text-center z-20 backdrop-blur-sm">
               {whiteboardText}
             </div>
           )}
-          
+
           {isGeneratingPDF && (
             <div className="absolute inset-0 bg-black/50 backdrop-blur-md rounded-xl flex items-center justify-center z-50">
               <div className="bg-[#202124] border border-gray-700 px-6 py-3 rounded-full shadow-lg flex items-center gap-3">
                 <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
-                <span className="text-white font-medium">Saving class notes...</span>
+                <span className="text-white font-medium">
+                  Saving class notes...
+                </span>
               </div>
             </div>
           )}
         </div>
-        
+
         {isChatOpen && (
           <div className="absolute right-0 top-0 bottom-0 w-full sm:w-96 md:w-[400px] z-50 shadow-2xl transition-transform duration-300 ease-in-out">
-            <ChatPanel 
-              onSendMessage={handleSendMessage} 
-              onClose={() => setIsChatOpen(false)} 
+            <ChatPanel
+              onSendMessage={handleSendMessage}
+              onClose={() => setIsChatOpen(false)}
               disabled={false}
               messages={messages}
             />
           </div>
         )}
       </div>
-      
+
       <div className="h-auto min-h-20 w-full flex flex-wrap items-center justify-between px-4 py-3 gap-y-4">
         <div className="flex items-center gap-4 text-white w-full md:w-1/4 justify-center md:justify-start">
           <span className="text-lg font-medium">AI Classroom</span>
         </div>
-        
+
         <div className="flex items-center gap-2 md:gap-3 w-full md:w-2/4 justify-center flex-wrap relative">
           <AudioVisualizer stream={stream} isListening={micOn} />
-          <button 
+          <button
             onClick={toggleMic}
-            className={`p-3 rounded-full ${micOn ? 'bg-red-600 hover:bg-red-700 animate-pulse' : 'bg-[#3c4043] hover:bg-[#4d5155]'} text-white transition-colors relative`}
+            className={`p-3 rounded-full ${micOn ? "bg-red-600 hover:bg-red-700 animate-pulse" : "bg-[#3c4043] hover:bg-[#4d5155]"} text-white transition-colors relative`}
             title={micOn ? "Stop Listening" : "Start Voice Control"}
           >
-            {micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+            {micOn ? (
+              <Mic className="w-5 h-5" />
+            ) : (
+              <MicOff className="w-5 h-5" />
+            )}
           </button>
-          <button 
+          <button
             onClick={toggleVideo}
-            className={`p-3 rounded-full ${videoOn ? 'bg-[#3c4043] hover:bg-[#4d5155]' : 'bg-[#ea4335] hover:bg-[#f25c50]'} text-white transition-colors`}
+            className={`p-3 rounded-full ${videoOn ? "bg-[#3c4043] hover:bg-[#4d5155]" : "bg-[#ea4335] hover:bg-[#f25c50]"} text-white transition-colors`}
           >
-            {videoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+            {videoOn ? (
+              <Video className="w-5 h-5" />
+            ) : (
+              <VideoOff className="w-5 h-5" />
+            )}
           </button>
-          <button 
+          <button
             onClick={() => setCcOn(!ccOn)}
-            className={`hidden sm:block p-3 rounded-full ${ccOn ? 'bg-blue-100 text-blue-600' : 'bg-[#3c4043] hover:bg-[#4d5155] text-white'} transition-colors`}
+            className={`hidden sm:block p-3 rounded-full ${ccOn ? "bg-blue-100 text-blue-600" : "bg-[#3c4043] hover:bg-[#4d5155] text-white"} transition-colors`}
           >
             <ClosedCaption className="w-5 h-5" />
           </button>
-          <button 
+          <button
             onClick={generatePDF}
-            className={`p-3 rounded-full ${isGeneratingPDF ? 'bg-green-600 animate-pulse' : 'bg-[#3c4043] hover:bg-[#4d5155]'} text-white transition-colors`}
+            className={`p-3 rounded-full ${isGeneratingPDF ? "bg-green-600 animate-pulse" : "bg-[#3c4043] hover:bg-[#4d5155]"} text-white transition-colors`}
             title="Download Merged Notes"
-            disabled={isGeneratingPDF || (!whiteboardText && slideHistory.length === 0)}
+            disabled={
+              isGeneratingPDF || (!whiteboardText && slideHistory.length === 0)
+            }
           >
             <Download className="w-5 h-5" />
           </button>
-          <button 
+          <button
             onClick={() => setHandRaised(!handRaised)}
-            className={`hidden sm:block p-3 rounded-full ${handRaised ? 'bg-blue-100 text-blue-600' : 'bg-[#3c4043] hover:bg-[#4d5155] text-white'} transition-colors`}
+            className={`hidden sm:block p-3 rounded-full ${handRaised ? "bg-blue-100 text-blue-600" : "bg-[#3c4043] hover:bg-[#4d5155] text-white"} transition-colors`}
           >
             <Hand className="w-5 h-5" />
           </button>
 
-          <button 
+          <button
             onClick={toggleScreenShare}
-            className={`hidden md:block p-3 rounded-full ${screenShareOn ? 'bg-blue-600 hover:bg-blue-700 animate-pulse' : 'bg-[#3c4043] hover:bg-[#4d5155]'} text-white transition-colors`}
+            className={`hidden md:block p-3 rounded-full ${screenShareOn ? "bg-blue-600 hover:bg-blue-700 animate-pulse" : "bg-[#3c4043] hover:bg-[#4d5155]"} text-white transition-colors`}
             title={screenShareOn ? "Stop Sharing Screen" : "Share Screen"}
           >
             <MonitorUp className="w-5 h-5" />
@@ -1255,37 +1749,48 @@ PERMANENT_HIGHLIGHT:
           <button className="hidden sm:block p-3 rounded-full bg-[#3c4043] hover:bg-[#4d5155] text-white transition-colors">
             <MoreVertical className="w-5 h-5" />
           </button>
-          <button 
+          <button
             onClick={handleEndCall}
             className="p-3 rounded-full bg-[#ea4335] hover:bg-[#f25c50] text-white transition-colors px-6"
           >
             <PhoneOff className="w-5 h-5" />
           </button>
         </div>
-        
+
         <div className="flex items-center gap-3 w-full md:w-1/4 justify-center md:justify-end">
-          <button 
+          <button
             onClick={() => setIsChatOpen(!isChatOpen)}
-            className={`p-2 rounded-full transition-colors ${isChatOpen ? 'bg-blue-100 text-blue-600' : 'hover:bg-[#3c4043] text-white'}`}
+            className={`p-2 rounded-full transition-colors ${isChatOpen ? "bg-blue-100 text-blue-600" : "hover:bg-[#3c4043] text-white"}`}
           >
             <MessageSquare className="w-5 h-5" />
           </button>
-          
+
           <div className="relative group">
             <button className="p-2 rounded-full hover:bg-[#3c4043] text-white transition-colors">
               <Info className="w-5 h-5" />
             </button>
             <div className="absolute bottom-full right-0 mb-2 w-64 bg-white rounded-lg shadow-xl p-4 hidden group-hover:block z-50">
-              <h3 className="font-bold text-gray-800 mb-2 border-b pb-1">Session History</h3>
+              <h3 className="font-bold text-gray-800 mb-2 border-b pb-1">
+                Session History
+              </h3>
               <div className="max-h-60 overflow-y-auto text-sm">
                 {sessionHistory.length === 0 ? (
                   <p className="text-gray-500 italic">No interactions yet.</p>
                 ) : (
                   sessionHistory.map((item, i) => (
-                    <div key={i} className="mb-3 border-b border-gray-100 pb-2 last:border-0">
-                      <div className="text-xs text-gray-400">{item.timestamp}</div>
-                      <div className="font-medium text-blue-600 truncate">{item.query}</div>
-                      <div className="text-gray-600 text-xs truncate">{item.response}</div>
+                    <div
+                      key={i}
+                      className="mb-3 border-b border-gray-100 pb-2 last:border-0"
+                    >
+                      <div className="text-xs text-gray-400">
+                        {item.timestamp}
+                      </div>
+                      <div className="font-medium text-blue-600 truncate">
+                        {item.query}
+                      </div>
+                      <div className="text-gray-600 text-xs truncate">
+                        {item.response}
+                      </div>
                     </div>
                   ))
                 )}
@@ -1300,16 +1805,20 @@ PERMANENT_HIGHLIGHT:
           </button>
         </div>
       </div>
-      
+
       {/* Hidden container for rendering historical slides for PDF export */}
       {isGeneratingPDF && slideHistory.length > 0 && (
         <div className="absolute top-[-9999px] left-0 pointer-events-none z-[-100]">
           {slideHistory.map((slide, i) => (
-            <div key={i} id={`pdf-slide-${i}`} className="w-[800px] h-[600px] bg-[#ffffff] p-8">
-              {slide.mode === 'whiteboard' ? (
-                <Whiteboard 
-                  text={slide.text} 
-                  isWriting={false} 
+            <div
+              key={i}
+              id={`pdf-slide-${i}`}
+              className="w-[800px] h-auto min-h-[600px] bg-[#ffffff] p-8"
+            >
+              {slide.mode === "whiteboard" ? (
+                <Whiteboard
+                  text={slide.text}
+                  isWriting={false}
                   onWritingComplete={() => {}}
                   typingSpeed={0}
                   permanentHighlights={slide.permanentHighlights}
@@ -1317,15 +1826,17 @@ PERMANENT_HIGHLIGHT:
                   diagrams={slide.diagrams}
                   image={slide.image}
                   immediateDraw={true}
+                  isPdfMode={true}
                 />
-              ) : slide.mode === 'code' ? (
-                <CodeBoard 
-                  text={slide.text} 
-                  isWriting={false} 
+              ) : slide.mode === "code" ? (
+                <CodeBoard
+                  text={slide.text}
+                  isWriting={false}
                   onWritingComplete={() => {}}
                   expectedDuration={0}
                   language={slide.language}
                   immediateDraw={true}
+                  isPdfMode={true}
                 />
               ) : null}
             </div>
