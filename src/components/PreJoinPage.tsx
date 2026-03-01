@@ -1,5 +1,12 @@
-import { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Video, VideoOff, ArrowRight, ArrowLeft } from 'lucide-react';
+import { useState, useRef, useEffect } from "react";
+import {
+  Mic,
+  MicOff,
+  Video,
+  VideoOff,
+  ArrowRight,
+  ArrowLeft,
+} from "lucide-react";
 
 interface PreJoinPageProps {
   isActive: boolean;
@@ -7,7 +14,11 @@ interface PreJoinPageProps {
   onBack: () => void;
 }
 
-export default function PreJoinPage({ isActive, onJoin, onBack }: PreJoinPageProps) {
+export default function PreJoinPage({
+  isActive,
+  onJoin,
+  onBack,
+}: PreJoinPageProps) {
   const [micOn, setMicOn] = useState(false);
   const [videoOn, setVideoOn] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -27,38 +38,45 @@ export default function PreJoinPage({ isActive, onJoin, onBack }: PreJoinPagePro
     };
   }, [isActive]);
 
+  // Replace the initMedia effect with this:
   useEffect(() => {
     if (!isActive) return;
-    // Initial setup - try to get permissions
+
+    let localStream: MediaStream | null = null;
+
     const initMedia = async () => {
       try {
         setError(null);
-        const newStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true,
+        });
+        localStream = newStream;
         setStream(newStream);
         setMicOn(true);
         setVideoOn(true);
-        if (videoRef.current) {
-          videoRef.current.srcObject = newStream;
-        }
+        // Don't set srcObject here — let the separate effect below handle it
       } catch (e: any) {
-        console.error("Error accessing media devices:", e);
-        if (e.name === 'NotAllowedError' || e.name === 'PermissionDismissedError') {
-          setError("Camera/Microphone access denied. Please enable permissions in your browser settings.");
-        } else if (e.name === 'NotFoundError') {
-          setError("No camera or microphone found on this device.");
-        } else {
-          setError("Could not access media devices. You can still join without them.");
-        }
+        // ... your existing error handling
       }
     };
+
     initMedia();
 
     return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+      localStream?.getTracks().forEach((track) => track.stop()); // ✅ uses local ref, not stale state
+      setStream(null);
+      setMicOn(false);
+      setVideoOn(false);
     };
   }, [isActive]);
+
+  // Add a dedicated effect to sync stream → video element
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream, videoOn]); // re-runs when stream is set OR video is toggled back on
 
   const toggleMic = () => {
     if (stream) {
@@ -93,7 +111,8 @@ export default function PreJoinPage({ isActive, onJoin, onBack }: PreJoinPagePro
         </h2>
 
         <p className={`pj-body ${visible ? "show" : ""}`}>
-          You are about to enter the AI Classroom. Check your audio and video settings before joining.
+          You are about to enter the AI Classroom. Check your audio and video
+          settings before joining.
         </p>
 
         <div className={`pj-divider ${visible ? "show" : ""}`} />
@@ -103,17 +122,26 @@ export default function PreJoinPage({ isActive, onJoin, onBack }: PreJoinPagePro
           <div className="pj-preview-label">Preview</div>
           <div className="pj-preview-window">
             <div className="pj-preview-bar">
-              <div className="pj-preview-dot" style={{ background: "#ff5f57" }} />
-              <div className="pj-preview-dot" style={{ background: "#febc2e" }} />
-              <div className="pj-preview-dot" style={{ background: "#28c840" }} />
+              <div
+                className="pj-preview-dot"
+                style={{ background: "#ff5f57" }}
+              />
+              <div
+                className="pj-preview-dot"
+                style={{ background: "#febc2e" }}
+              />
+              <div
+                className="pj-preview-dot"
+                style={{ background: "#28c840" }}
+              />
             </div>
-            
+
             {error ? (
               <div className="pj-error">
                 <VideoOff size={48} className="pj-error-icon" />
                 <p className="pj-error-title">Media Access Error</p>
                 <p className="pj-error-text">{error}</p>
-                <button 
+                <button
                   onClick={() => window.location.reload()}
                   className="pj-error-btn"
                 >
@@ -121,11 +149,11 @@ export default function PreJoinPage({ isActive, onJoin, onBack }: PreJoinPagePro
                 </button>
               </div>
             ) : videoOn ? (
-              <video 
-                ref={videoRef} 
-                autoPlay 
-                playsInline 
-                muted 
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
                 className="pj-video"
               />
             ) : (
@@ -135,19 +163,19 @@ export default function PreJoinPage({ isActive, onJoin, onBack }: PreJoinPagePro
                 </div>
               </div>
             )}
-            
+
             {!error && (
               <div className="pj-controls">
-                <button 
+                <button
                   onClick={toggleMic}
-                  className={`pj-control-btn ${micOn ? '' : 'off'}`}
+                  className={`pj-control-btn ${micOn ? "" : "off"}`}
                   title={micOn ? "Mute microphone" : "Unmute microphone"}
                 >
                   {micOn ? <Mic size={20} /> : <MicOff size={20} />}
                 </button>
-                <button 
+                <button
                   onClick={toggleVideo}
-                  className={`pj-control-btn ${videoOn ? '' : 'off'}`}
+                  className={`pj-control-btn ${videoOn ? "" : "off"}`}
                   title={videoOn ? "Turn off camera" : "Turn on camera"}
                 >
                   {videoOn ? <Video size={20} /> : <VideoOff size={20} />}
@@ -158,11 +186,11 @@ export default function PreJoinPage({ isActive, onJoin, onBack }: PreJoinPagePro
         </div>
 
         {/* Join Button */}
-        <button 
+        <button
           onClick={() => {
             // Stop local preview stream before joining so the main app can take over
             if (stream) {
-              stream.getTracks().forEach(track => track.stop());
+              stream.getTracks().forEach((track) => track.stop());
             }
             onJoin();
           }}
